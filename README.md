@@ -1,8 +1,7 @@
-# Couchbase RAG Demo
+# Couchbase RAG Demo - Developed By: Gang Jun
 
 A fully local Retrieval-Augmented Generation (RAG) application powered by **Couchbase Community Edition 8.0.1**, **Ollama (gemma4:e4b)**, and **FastAPI** — no cloud services, no API keys, no proprietary infrastructure.
 
-**Developer:** Gang Jun
 
 ---
 
