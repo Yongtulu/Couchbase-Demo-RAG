@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Couchbase RAG Demo — Gang Jun</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0f14;--surface:#13161e;--surface2:#1a1e2a;--surface3:#222636;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --text:#e8eaf0;--muted:#7a7f96;
+  --accent:#E8C84A;--accent2:#f0d878;
+  --teal:#3ecfb2;--blue:#5b9cf6;--green:#5dca8a;--coral:#f07060;
+  --radius:10px;--radius-lg:14px;
+  --mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.6}
+.shell{display:grid;grid-template-rows:auto 1fr;height:100vh}
+
+/* topbar */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 2rem;height:56px;background:var(--surface);border-bottom:1px solid var(--border)}
+.topbar-left{display:flex;align-items:center;gap:14px}
+.cb-logo{width:34px;height:34px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center}
+.cb-logo svg{width:20px;height:20px}
+.brand{font-size:15px;font-weight:600;letter-spacing:-0.01em}
+.brand span{color:var(--accent)}
+.topbar-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.badge{font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:20px;border:1px solid var(--border2);color:var(--muted);white-space:nowrap}
+.badge.live{border-color:var(--teal);color:var(--teal)}
+.badge.live::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--teal);margin-right:6px;animation:blink 1.8s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+.dev-tag{font-size:12px;color:var(--muted)}
+.dev-tag strong{color:var(--text);font-weight:500}
+
+/* layout */
+.main{display:grid;grid-template-columns:320px 1fr;overflow:hidden}
+
+/* left panel */
+.left-panel{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.panel-title{font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);padding:16px 20px 10px}
+.query-area{padding:0 16px 16px;flex-shrink:0}
+textarea#question{width:100%;height:90px;resize:none;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:var(--sans);font-size:14px;padding:12px 14px;outline:none;transition:border-color 0.2s}
+textarea#question:focus{border-color:var(--accent)}
+textarea#question::placeholder{color:var(--muted)}
+.ask-btn{margin-top:10px;width:100%;padding:11px;background:var(--accent);color:#0d0f14;border:none;border-radius:var(--radius);font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 0.2s,transform 0.1s}
+.ask-btn:hover{background:var(--accent2)}
+.ask-btn:active{transform:scale(0.98)}
+.ask-btn.loading{background:var(--surface3);color:var(--muted);cursor:not-allowed}
+
+.suggestions{padding:0 16px 8px}
+.sug-label{font-size:11px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em}
+.sug-item{display:block;width:100%;text-align:left;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--sans);font-size:12px;padding:8px 12px;margin-bottom:6px;cursor:pointer;transition:border-color 0.15s,background 0.15s}
+.sug-item:hover{border-color:var(--accent);background:var(--surface3)}
+
+.stat-section{padding:16px;border-top:1px solid var(--border);margin-top:auto}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat-card{background:var(--surface2);border-radius:var(--radius);padding:10px 12px;border:1px solid var(--border)}
+.stat-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px}
+.stat-val{font-size:18px;font-weight:600;font-family:var(--mono);color:var(--accent)}
+.stat-sub{font-size:10px;color:var(--muted);margin-top:2px}
+
+/* right panel */
+.right-panel{display:flex;flex-direction:column;overflow:hidden}
+.tab-bar{display:flex;gap:2px;padding:12px 20px 0;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.tab{padding:8px 18px;font-size:13px;font-weight:500;border:none;background:transparent;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color 0.15s;font-family:var(--sans)}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-content{flex:1;overflow-y:auto;padding:20px;display:none}
+.tab-content.active{display:block}
+
+/* cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}
+.card-head-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted)}
+.card-badge{font-size:10px;font-family:var(--mono);padding:2px 8px;border-radius:20px}
+.badge-teal{background:rgba(62,207,178,0.12);color:var(--teal)}
+.badge-amber{background:rgba(232,200,74,0.12);color:var(--accent)}
+.badge-blue{background:rgba(91,156,246,0.12);color:var(--blue)}
+.badge-green{background:rgba(93,202,138,0.12);color:var(--green)}
+.card-body{padding:12px 14px}
+
+/* debug tab */
+.debug-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.chunk-item{padding:10px 0;border-bottom:1px solid var(--border)}
+.chunk-item:last-child{border-bottom:none}
+.chunk-meta{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px}
+.chunk-source{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.score-row{display:flex;align-items:center;gap:6px}
+.score-bar-bg{width:70px;height:4px;border-radius:2px;background:var(--surface3)}
+.score-bar-fill{height:100%;border-radius:2px;transition:width 0.5s ease}
+.score-num{font-size:11px;font-family:var(--mono);color:var(--accent);min-width:36px;text-align:right}
+.chunk-text{font-size:12px;color:#9aa0b8;line-height:1.65}
+.prompt-block{background:var(--surface2);border-radius:var(--radius);padding:12px;font-size:11px;font-family:var(--mono);color:#9aa0b8;line-height:1.8;white-space:pre-wrap;word-break:break-word}
+.answer-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.answer-body{padding:18px 20px;font-size:14px;line-height:1.8;color:var(--text);white-space:pre-wrap}
+.answer-meta{display:flex;gap:16px;padding:10px 20px;border-top:1px solid var(--border)}
+.answer-meta-item{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.answer-meta-item span{color:var(--accent)}
+
+/* n1ql tab */
+.sql-block{background:var(--surface2);border-radius:var(--radius);padding:14px 16px;font-family:var(--mono);font-size:12px;color:#9aa0b8;line-height:1.9;white-space:pre}
+.kw{color:var(--blue)}.ks{color:var(--green)}.kv{color:var(--teal)}
+.run-btn{padding:5px 14px;background:var(--accent);color:#0d0f14;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+.run-btn:hover{background:var(--accent2)}
+.result-row{display:grid;grid-template-columns:180px 1fr auto;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;align-items:start}
+.result-row:last-child{border-bottom:none}
+.result-id{font-family:var(--mono);color:var(--accent);font-size:11px}
+.result-preview{color:#9aa0b8;line-height:1.6}
+.result-page{font-family:var(--mono);color:var(--muted);font-size:11px;white-space:nowrap}
+
+/* stats tab */
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+.big-stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px}
+.big-stat-icon{font-size:22px;margin-bottom:10px}
+.big-stat-val{font-size:32px;font-weight:600;font-family:var(--mono);color:var(--accent)}
+.big-stat-label{font-size:12px;color:var(--muted);margin-top:4px}
+.info-table{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.info-row{display:flex;justify-content:space-between;padding:11px 16px;border-bottom:1px solid var(--border);font-size:13px}
+.info-row:last-child{border-bottom:none}
+.info-key{color:var(--muted)}
+.info-val{font-family:var(--mono);color:var(--text);font-size:12px}
+
+/* empty / loader */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px;text-align:center;gap:10px}
+.empty-icon{font-size:36px;opacity:0.3}
+.empty-text{font-size:13px;color:var(--muted)}
+.loader{display:flex;gap:6px;justify-content:center;padding:24px}
+.loader span{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:bounce 1.2s infinite}
+.loader span:nth-child(2){animation-delay:.2s}
+.loader span:nth-child(3){animation-delay:.4s}
+@keyframes bounce{0%,100%{transform:translateY(0);opacity:.4}50%{transform:translateY(-8px);opacity:1}}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:3px}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- topbar -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="cb-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <ellipse cx="12" cy="5" rx="9" ry="3"/>
+          <path d="M3 5v14a9 3 0 0 0 18 0V5"/>
+          <path d="M3 12a9 3 0 0 0 18 0"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand">Couchbase <span>RAG</span> Demo</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span class="badge live">Couchbase Community 8.0.1</span>
+      <span class="badge">FTS · BM25 Retrieval</span>
+      <span class="badge">Ollama · gemma4:e4b</span>
+      <div class="dev-tag">Developer: <strong>Gang Jun</strong></div>
+    </div>
+  </header>
+
+  <div class="main">
+
+    <!-- left: query panel -->
+    <aside class="left-panel">
+      <div class="panel-title">Ask the Knowledge Base</div>
+      <div class="query-area">
+        <textarea id="question" placeholder="Ask anything about Couchbase…&#10;e.g. How does N1QL SELECT work?"></textarea>
+        <button class="ask-btn" id="ask-btn" onclick="runQuery()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Ask
+        </button>
+      </div>
+
+      <div class="suggestions">
+        <div class="sug-label">Try these</div>
+        <button class="sug-item" onclick="setQ(this)">How do I install Couchbase Server?</button>
+        <button class="sug-item" onclick="setQ(this)">How does the N1QL SELECT statement work?</button>
+        <button class="sug-item" onclick="setQ(this)">What is the difference between INSERT and UPSERT?</button>
+        <button class="sug-item" onclick="setQ(this)">How do I filter results using WHERE in N1QL?</button>
+        <button class="sug-item" onclick="setQ(this)">How does GROUP BY work in Couchbase queries?</button>
+      </div>
+
+      <div class="stat-section">
+        <div class="panel-title" style="padding:0 0 10px">Knowledge Base</div>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-label">Chunks</div>
+            <div class="stat-val" id="stat-chunks">—</div>
+            <div class="stat-sub">in Couchbase</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Retrieval</div>
+            <div class="stat-val">FTS</div>
+            <div class="stat-sub">BM25 ranking</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">FTS ms</div>
+            <div class="stat-val" id="stat-rt">—</div>
+            <div class="stat-sub">last query</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">LLM ms</div>
+            <div class="stat-val" id="stat-llm">—</div>
+            <div class="stat-sub">last query</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- right: tabbed debug panel -->
+    <section class="right-panel">
+      <div class="tab-bar">
+        <button class="tab active" data-tab="debug" onclick="switchTab('debug')">Debug View</button>
+        <button class="tab" data-tab="n1ql" onclick="switchTab('n1ql')">N1QL Verify</button>
+        <button class="tab" data-tab="stats" onclick="switchTab('stats')">Stats</button>
+      </div>
+
+      <!-- Debug tab -->
+      <div class="tab-content active" id="tab-debug">
+        <div id="debug-empty" class="empty">
+          <div class="empty-icon">🔍</div>
+          <div class="empty-text">Ask a question to see the full pipeline —<br>FTS retrieval · prompt assembly · LLM answer.</div>
+        </div>
+        <div id="debug-loader" style="display:none"><div class="loader"><span></span><span></span><span></span></div></div>
+        <div id="debug-result" style="display:none">
+          <div class="debug-grid">
+            <div class="card">
+              <div class="card-head">
+                <span class="card-head-label">FTS Recall (BM25)</span>
+                <span class="card-badge badge-teal" id="top-k-badge">Top 3</span>
+              </div>
+              <div class="card-body" id="chunks-list"></div>
+            </div>
+            <div class="card">
+              <div class="card-head">
+                <span class="card-head-label">Prompt sent to LLM</span>
+                <span class="card-badge badge-amber">gemma4:e4b</span>
+              </div>
+              <div class="card-body"><div class="prompt-block" id="prompt-display"></div></div>
+            </div>
+          </div>
+          <div class="answer-card">
+            <div class="card-head">
+              <span class="card-head-label">Generated Answer</span>
+              <span class="card-badge badge-green">Ollama · gemma4:e4b</span>
+            </div>
+            <div class="answer-body" id="answer-text"></div>
+            <div class="answer-meta">
+              <div class="answer-meta-item">FTS <span id="meta-rt">—</span> ms</div>
+              <div class="answer-meta-item">LLM <span id="meta-llm">—</span> ms</div>
+              <div class="answer-meta-item">Chunks used <span id="meta-chunks">—</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- N1QL tab -->
+      <div class="tab-content" id="tab-n1ql">
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-head">
+            <span class="card-head-label">N1QL Verification Query</span>
+            <button class="run-btn" onclick="runN1QL()">▶ Run</button>
+          </div>
+          <div class="card-body"><div class="sql-block" id="sql-display">-- Ask a question first to auto-generate the N1QL statement</div></div>
+        </div>
+        <div class="card" id="sql-result-card">
+          <div class="card-head">
+            <span class="card-head-label">Query Results</span>
+            <span class="card-badge badge-blue" id="sql-count">0 rows</span>
+          </div>
+          <div id="sql-result"><div class="empty"><div class="empty-text">Results appear here after running the query</div></div></div>
+        </div>
+      </div>
+
+      <!-- Stats tab -->
+      <div class="tab-content" id="tab-stats">
+        <div class="stats-grid">
+          <div class="big-stat">
+            <div class="big-stat-icon">📄</div>
+            <div class="big-stat-val" id="bs-chunks">—</div>
+            <div class="big-stat-label">Total chunks in Couchbase</div>
+          </div>
+          <div class="big-stat">
+            <div class="big-stat-icon">🔎</div>
+            <div class="big-stat-val">FTS</div>
+            <div class="big-stat-label">BM25 full-text retrieval</div>
+          </div>
+          <div class="big-stat">
+            <div class="big-stat-icon">🤖</div>
+            <div class="big-stat-val" style="font-size:18px">gemma4:e4b</div>
+            <div class="big-stat-label">Local LLM via Ollama</div>
+          </div>
+        </div>
+        <div class="info-table">
+          <div class="info-row"><span class="info-key">Bucket</span><span class="info-val" id="inf-bucket">—</span></div>
+          <div class="info-row"><span class="info-key">Scope</span><span class="info-val" id="inf-scope">—</span></div>
+          <div class="info-row"><span class="info-key">Collection</span><span class="info-val" id="inf-col">—</span></div>
+          <div class="info-row"><span class="info-key">FTS Index</span><span class="info-val" id="inf-idx">—</span></div>
+          <div class="info-row"><span class="info-key">Retrieval Method</span><span class="info-val" id="inf-ret">—</span></div>
+          <div class="info-row"><span class="info-key">LLM Model</span><span class="info-val" id="inf-llm">—</span></div>
+          <div class="info-row"><span class="info-key">Couchbase Edition</span><span class="info-val">Community 8.0.1</span></div>
+          <div class="info-row"><span class="info-key">Developer</span><span class="info-val">Gang Jun</span></div>
+        </div>
+      </div>
+
+    </section>
+  </div>
+</div>
+
+<script>
+let lastKeyword = 'index';
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + name));
+  if (name === 'stats') loadStats();
+}
+
+function setQ(el) { document.getElementById('question').value = el.textContent.trim(); }
+
+async function runQuery() {
+  const q = document.getElementById('question').value.trim();
+  if (!q) return;
+  setLoading(true);
+  document.getElementById('debug-empty').style.display = 'none';
+  document.getElementById('debug-result').style.display = 'none';
+  document.getElementById('debug-loader').style.display = 'block';
+  try {
+    const res = await fetch('/api/query', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question: q}),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    renderDebug(data);
+    buildSQL(data);
+  } catch(e) {
+    alert('Error: ' + e.message);
+  } finally {
+    setLoading(false);
+    document.getElementById('debug-loader').style.display = 'none';
+    document.getElementById('debug-result').style.display = 'block';
+  }
+}
+
+function setLoading(on) {
+  const btn = document.getElementById('ask-btn');
+  if (on) {
+    btn.textContent = 'Thinking…';
+    btn.className = 'ask-btn loading';
+    btn.onclick = null;
+  } else {
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Ask';
+    btn.className = 'ask-btn';
+    btn.onclick = runQuery;
+  }
+}
+
+function renderDebug(data) {
+  const colors = ['#3ecfb2','#E8C84A','#5b9cf6'];
+  const maxScore = Math.max(...data.chunks.map(c => c.score), 0.001);
+  document.getElementById('top-k-badge').textContent = `Top ${data.chunks.length}`;
+  document.getElementById('chunks-list').innerHTML = data.chunks.map((c,i) => `
+    <div class="chunk-item">
+      <div class="chunk-meta">
+        <span class="chunk-source">${trunc(c.source_title,26)} · chunk ${c.chunk_index}</span>
+        <div class="score-row">
+          <div class="score-bar-bg"><div class="score-bar-fill" style="width:${Math.round(c.score/maxScore*100)}%;background:${colors[i%3]}"></div></div>
+          <span class="score-num">${c.score.toFixed(3)}</span>
+        </div>
+      </div>
+      <div class="chunk-text">${trunc(c.text, 150)}</div>
+    </div>
+  `).join('');
+
+  const shortPrompt = data.prompt.length > 700 ? data.prompt.substring(0,700) + '\n… [truncated]' : data.prompt;
+  document.getElementById('prompt-display').textContent = shortPrompt;
+  document.getElementById('answer-text').textContent = data.answer;
+  document.getElementById('meta-rt').textContent = data.retrieval_ms;
+  document.getElementById('meta-llm').textContent = data.llm_ms;
+  document.getElementById('meta-chunks').textContent = data.chunks.length;
+  document.getElementById('stat-rt').textContent = data.retrieval_ms;
+  document.getElementById('stat-llm').textContent = data.llm_ms;
+
+  const words = data.question.split(' ').filter(w => w.length > 4);
+  lastKeyword = words[0] || 'index';
+}
+
+function buildSQL(data) {
+  const kw = lastKeyword;
+  document.getElementById('sql-display').innerHTML =
+    `<span class="kw">SELECT</span> META().id <span class="kw">AS</span> doc_id,\n       source_title,\n       chunk_index,\n       <span class="kw">SUBSTR</span>(text, <span class="ks">0</span>, <span class="ks">120</span>) <span class="kw">AS</span> preview\n<span class="kw">FROM</span>   <span class="kv">\`rag_demo\`</span>\n<span class="kw">WHERE</span>  <span class="kw">CONTAINS</span>(<span class="kw">LOWER</span>(text), <span class="kw">LOWER</span>(<span class="kv">"${esc(kw)}"</span>))\n<span class="kw">ORDER</span>  <span class="kw">BY</span> chunk_index\n<span class="kw">LIMIT</span>  <span class="ks">5</span>;`;
+}
+
+async function runN1QL() {
+  const res = await fetch(`/api/n1ql?keyword=${encodeURIComponent(lastKeyword)}`);
+  if (!res.ok) { alert('N1QL error'); return; }
+  const data = await res.json();
+  document.getElementById('sql-count').textContent = `${data.rows.length} rows`;
+  const el = document.getElementById('sql-result');
+  if (!data.rows.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-text">No results for: ${esc(lastKeyword)}</div></div>`;
+    return;
+  }
+  el.innerHTML = data.rows.map(r => `
+    <div class="result-row">
+      <span class="result-id">${esc(r.doc_id||'')}</span>
+      <span class="result-preview">${esc(r.preview||'')}</span>
+      <span class="result-page">chunk ${r.chunk_index ?? '—'}</span>
+    </div>
+  `).join('');
+}
+
+async function loadStats() {
+  try {
+    const res = await fetch('/api/stats');
+    if (!res.ok) return;
+    const d = await res.json();
+    document.getElementById('bs-chunks').textContent = d.total_chunks >= 0 ? d.total_chunks : '—';
+    document.getElementById('stat-chunks').textContent = d.total_chunks >= 0 ? d.total_chunks : '—';
+    document.getElementById('inf-bucket').textContent = d.bucket;
+    document.getElementById('inf-scope').textContent = d.scope;
+    document.getElementById('inf-col').textContent = d.collection;
+    document.getElementById('inf-idx').textContent = d.fts_index;
+    document.getElementById('inf-ret').textContent = d.retrieval;
+    document.getElementById('inf-llm').textContent = d.llm_model;
+  } catch(_) {}
+}
+
+function trunc(s,n){ return s && s.length>n ? s.substring(0,n)+'…' : (s||''); }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+document.getElementById('question').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) runQuery();
+});
+
+loadStats();
+</script>
+</body>
+</html>
