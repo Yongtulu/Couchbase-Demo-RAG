@@ -159,29 +159,9 @@ couchbase-rag-demo/
 
 ---
 
-## Presentation Script
-
-This demo is designed for live technical presentations. Recommended flow:
-
-1. Open `http://127.0.0.1:8000` — ask a question, show the answer
-2. Switch to **Debug View** — walk through FTS scores and the assembled prompt
-3. Switch to **N1QL Verify** — run the query live, show raw data in Couchbase
-4. Switch to **Stats** — show chunk count, FTS index, LLM model
-5. Open `http://127.0.0.1:8091` — show the Couchbase Console
-   - **Buckets** — 4,456 documents, memory/disk usage
-   - **Search** — active `chunk_fts_idx` with document count
-   - **Query → Workbench** — run a live N1QL query with the question keyword
-
----
-
 ## Notes
 
 - Vector Search is an Enterprise Edition feature. This demo uses FTS (BM25) which is fully supported in Community Edition.
 - The ingestion pipeline supports resume — re-running `ingest.py` skips already-stored documents.
 - LLM response time (~20s) reflects local CPU inference on `gemma4:e4b`. GPU acceleration via Ollama will significantly reduce this.
 
----
-
-## License
-
-MIT
