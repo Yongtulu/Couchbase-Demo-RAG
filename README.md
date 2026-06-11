@@ -33,6 +33,20 @@ The application is organized into two pipelines:
 
 ---
 
+## Demo UI
+
+![Demo UI](docs/screenshots/demo_ui.png)
+
+The frontend is a single-page HTML application served by FastAPI. It provides three views:
+
+**Debug View** — shows the full RAG pipeline for each query: FTS recall results with BM25 relevance scores, the raw prompt sent to the LLM, and the generated answer with timing breakdowns (FTS latency vs. LLM latency).
+
+**N1QL Verify** — auto-generates and executes a N1QL query based on the current question's keywords, showing raw document previews from Couchbase. This panel is designed to prove to a live audience that the retrieval is backed by a real database, not an in-memory cache.
+
+**Stats** — displays knowledge base metadata: total chunk count, bucket name, FTS index name, retrieval method, and LLM model.
+
+---
+
 ## Couchbase Community Edition — Role in This Demo
 
 Couchbase is not just a storage layer in this demo — it is the core retrieval engine. The following Couchbase capabilities are actively used:
@@ -52,19 +66,6 @@ After FTS returns matching document IDs and scores, the full document content is
 ### 5. Couchbase Web Console
 The Couchbase Web Console at `http://127.0.0.1:8091` provides live visibility into the running system during a demo: the Buckets page shows 4,456 documents with memory and disk usage; the Search page shows the active FTS index with document count; the Query Workbench allows live N1QL execution.
 
----
-
-## Demo UI
-
-![Demo UI](docs/screenshots/demo_ui.png)
-
-The frontend is a single-page HTML application served by FastAPI. It provides three views:
-
-**Debug View** — shows the full RAG pipeline for each query: FTS recall results with BM25 relevance scores, the raw prompt sent to the LLM, and the generated answer with timing breakdowns (FTS latency vs. LLM latency).
-
-**N1QL Verify** — auto-generates and executes a N1QL query based on the current question's keywords, showing raw document previews from Couchbase. This panel is designed to prove to a live audience that the retrieval is backed by a real database, not an in-memory cache.
-
-**Stats** — displays knowledge base metadata: total chunk count, bucket name, FTS index name, retrieval method, and LLM model.
 
 ---
 
